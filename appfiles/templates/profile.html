@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Profile
+{% endblock %}
+
+{% block body_attrs %} onload="profilemain();" {% endblock %}
+
+{% block main %}
+    <div class="jumbotron">
+        <div class="userdisplay-lg header-msg-primary">Profile.</div>
+        <hr class="header-hr">
+        <div class="userdisplay-sm header-msg-secondary">Check yoself out!</div><br>
+    </div>
+    
+    <div class='container-fluid'>
+        <div class='row'>
+            <div class='col-sm'>
+                <div class='right'>
+                    <!-- Display current user's username -->
+                    <div class='userdisplay-md'>Username: <b>{{ username }}</b></div>
+                    <br>
+                    <!-- View remaining balance and add funds -->
+                    <div class='userdisplay-md'>
+                        Profile Age: <b>{{ age }} days old</b>
+                    </div>
+                    <br>
+                    <!-- Change password using AJAX-generated form -->
+                    <div class='userdisplay-md'>
+                        Forgot your password?
+                        &nbsp; <br> <br><button class="btn btn-warning" id="openpw" type="button">Change Password</button>
+                        <form action="/profilechange" id='pw' method="post" class="needs-validation" novalidate>
+                            <div id='passchange'>
+                                <!-- new password forms, validation, and submit button here -->
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class='col-sm'>
+                <!-- Default profile picture -->
+                <div class='left'>
+                    <img src = '{{ proPic }}' width='200' alt='Profile Picture'>
+                </div>
+                <br>
+                <!-- File selector to choose new picture -->
+                <div id='changePicture-container'>
+                    <form action="/profilechange" id='picture' class='left' method="post">
+                        <div class="form-group">
+                            <input type="file" class="form-control-file" id="newPicture" name="newPicture" onchange="selectPicture();">
+                            <input type="hidden"name="picURL" id="picURL" value="">
+                        </div>
+                        <div id='imgsubmit'> </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/profilechange.js"></script>
+    <script src="/static/bootstrapval.js"></script>
+
+{% endblock %}

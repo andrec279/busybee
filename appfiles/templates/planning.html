@@ -1,0 +1,212 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Planning
+{% endblock %}
+
+{% block body_attrs %} onload="goalmain();" {% endblock %}
+
+{% block main %}
+<div class="jumbotron">
+    <div class="userdisplay-lg header-msg-primary">Planning.</div>
+    <hr class="header-hr">
+    <div class="userdisplay-sm header-msg-secondary">Start here.</div><br>
+    <!--Button to trigger pop up of goal creation window-->
+    <button type="button" class="btn btn-warning userdisplay-md" id="openButton" onclick="popUpOpen();">New Goal</button>
+</div>
+
+<!--1st Hidden form to store goal rows-->
+<div class="hidden" id="hiddengoalrows">
+    {% for tuple in rows %}
+        <div class="goalrow">
+        {% for item in tuple %}
+            <span class="goalattribute">{{ item }}</span>
+        {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+
+<!-- Hidden form to store task rows -->
+<div class="hidden" id="hiddentaskrows">
+    {% for taskattributes in taskrows %}
+        <div class="taskrow">
+            {% for taskattribute in taskattributes %}
+                <span class="taskattribute">{{ taskattribute }}</span>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+
+<!-- POP UP FOR CREATING NEW GOALS -->
+<div class="popUp" id="createGoal" name="createGoal"> 
+    <div class="popUpContent">
+        <div class="userdisplay-md-lg banner">
+            New Goal
+        </div> <br>
+        
+        <!-- Goal form for submission -->
+        <form action="/planning" method="post" id="goalForm" name="goalForm" class="needs-validation" novalidate>
+            <!-- Goal Name Form -->
+            <div class="form-group">
+                <label for="goalInput">Enter Goal: </label><br>
+                <input type="text" class="form-control popUpForm" autocomplete="off" name="goalInput" id="goalInput" placeholder="Ex: Run a marathon" required>
+                <div class="invalid-feedback" id="goalFeedback">Please enter a goal</div>
+            </div>
+            
+            <!--Category Form-->
+            <div class="form-group">
+                <label for="categoryInput">Select Category: </label><br>
+                <!--Target select tag for onchange load of new category form-->
+                <select class="form-control popUpForm" autocomplete="off" name="categoryInput" id="categoryInput" required>
+                    <option selected="true" disabled="true">Choose Category</option>
+                    <option class='loadedCat'>Create New</option>                    
+                    
+                    <!-- Pull all unique categories from database -->
+                    {% for category in categories %}
+                        <option class="loadedCat databaseCategories">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <div class="invalid-feedback" id="catFeedback">Please select a category</div>
+                <div id="newcat">
+                    <!--XML Request loads category text form here-->
+                </div>
+            </div>
+            
+            <!--Deadline Form-->
+            <div class="form-group">
+              <label for="datepicker">Enter Deadline: </label><br>
+              <input type="date" name="datePicker" autocomplete="off" id="datepicker" class="form-control popUpForm" required>
+              <div class="invalid-feedback" id="deadlineFeedback">Please select a deadline</div>
+            </div>
+            
+            <button class="btn btn-warning goalbutton" type="submit">Create</button> 
+            <button type="button" class="btn btn-outline-secondary goalbutton" id="closeButton" onclick="popUpClose();">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<!-- GOAL DISPLAY POP UP -->
+<div class="popUp" id="displayGoal" name="displayGoal">
+    <div class="popUpContent">
+        <form action='/goalupdate' method='post' class='container-fluid' id='goalUpdate'>
+            <input type="hidden" id="updatedGoalID" name="updatedGoalID" value="">
+            <div class="banner">
+                <div id="goalDisplayName" class='userdisplay-md-lg'>
+                    <!-- Goal Name and Edit Button -->
+                </div>
+                <!-- Hidden Edit Indicator -->
+                <div id="editIndicator" class='hidden'>[ edit mode ]</div>
+            </div> 
+            
+            <br>
+            
+            <table>
+                <tr id="tableTopRow"> 
+                    <th>Category</th> 
+                    <th class='hidden updateNewCatForm' id='updateNewCatFormHeader'>New Category Name</th> 
+                    <th>Deadline</th> 
+                </tr>
+                <tr> 
+                    <td id="goalDisplayCat" class='data-editable-select'></td> 
+                    <td id='newCatFormContainer' class='hidden updateNewCatForm'>
+                        <input autocomplete='off' type='text' id='updateNewCatFormText' class='hidden updateNewCatForm'>
+                        <button id='updateNewCatFormSubmit' type='button' onclick='existingCatComplete();' class='btn btn-outline-warning hidden updateNewCatForm'>Add Category</button>
+                    </td> 
+                    <td id="goalDisplayDate" class='data-editable-date'></td> 
+                </tr>
+            </table>
+            
+            <hr>
+            
+            <!-- Hidden form to populate with all checked tasks upon update submission -->
+            <div id="checkedTaskList" class="hidden">
+                <!-- Populate with text inputs, name=checkeditem, id=[task_id] -->
+                
+            </div>
+            
+            <div id="taskList" class="container-fluid">
+                <!-- Task bucket includes a label (column 1) and checkbox (column 2) -->
+                <!-- Populate using renderGoal javascript function -->
+            </div>
+            
+            <br>
+            
+            <!-- Submit all information in goalRender window after changes are made -->
+            <button class='btn btn-warning hidden center' id='saveTaskChanges' type='submit'>Save Changes</button>
+        </form>
+
+        <br>
+        
+        <form action="/createtask" method="post" id="createNewTask" class="container-fluid">
+            <!-- Hidden form to store goalID from button that triggered popUpContent -->
+            <input type="hidden" id="openedGoalID" name="openedGoalID" value="">
+            <span class="form-group">
+                <label for="newTask">New Task: &nbsp;</label>
+                <input type="text" class="form-control popUpForm" autocomplete="off" name="newTaskName" id="newTaskName" required>
+            </span>
+            
+            <!-- Button to submit new task to server -->
+            <button class="btn btn-outline-secondary taskSave" id="taskSave" type="button">Save</button> 
+        </form>
+    </div>
+</div>
+
+<!-- Display Goal Buttons -->
+<div class="col-md" id="dynamicGoals">
+    <!-- Display message if user has no current goals -->
+    {% if goals == [] %}
+        You don't have any goals yet. Get started now!
+    
+    <!-- Pull goals from database and display as buttons -->
+    {% else %}
+        <!-- Hidden container to store goal names -->
+        <div class="hidden" id="hiddengoals">
+            {% for goal in goals %}
+                <div class="goalName">
+                    {{ goal }}
+                </div>
+            {% endfor %}
+        </div>
+        
+        {% for goalid in goalids %}
+            <div class="goalListItems">
+                <button type="button" id="{{ goalid }}" class="goalItem userdisplay-md" onclick="renderGoal(this.id);"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<script>
+    /* Open create goal pop-up window */
+    function popUpOpen() {
+        document.getElementById("createGoal").style.display = 'block';
+    }
+    
+    /* Close create goal pop-up window */
+    function popUpClose() {
+        document.getElementById("createGoal").style.display = 'none';
+    }
+    
+    /* Get ids of all popUp Elements to apply close out feature */
+    var popUp = document.getElementsByClassName("popUp");
+    var popUpIds = []
+    for (i=0;i<popUp.length;i++) {
+        popUpIds.push(popUp[i].id);
+    }
+    window.addEventListener("click", function(event) {
+        // Close target if clicked target is in list of popUps
+        if (popUpIds.includes(event.target.id)) {
+            (event.target).style.display = "none";
+            
+            // Make relevant features disappear when exiting out of goalDisplay windows
+            document.getElementById('saveTaskChanges').style.display = 'none';
+            document.getElementById('editIndicator').style.display = 'none';
+        };
+    })
+        
+</script>
+    
+    <script src='/static/creategoals.js'></script>
+    <script src='/static/bootstrapval.js'></script>
+    
+{% endblock %}

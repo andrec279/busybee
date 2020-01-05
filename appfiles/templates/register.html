@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block title %} Register {% endblock %}
+
+{% block main %}
+    <div class="header"><h1>Register New Account</h1></div>
+    <hr>
+    <form action="/register" id='register' method="post" class="needs-validation" novalidate>
+        <div class="form-group">
+            <input id="username" autocomplete="off" autofocus class="form-control"
+            name="username" placeholder="Username" type="text" required>
+            <div class="invalid-feedback" id="usernamefeedback">Please enter a username</div>
+        </div>
+        <div class="form-group">
+            <input id="password" class="form-control" name="password" placeholder="Password" type="password" required>
+            <div class="invalid-feedback passcheck" id="passfeedback">Please enter a password</div>
+        </div>
+        <div class="form-group">
+            <input id="confirmation" class="form-control" name="confirmation" placeholder="Confirm Password" type="password" required>
+            <div class="invalid-feedback passcheck" id="confeedback">Please confirm your password</div>
+        </div>
+        <button class="btn btn-primary" type="submit">Register</button>
+    </form>
+
+    <script src="/static/userpassval.js"></script>
+    <script src="/static/bootstrapval.js"></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block main %}
+    <!--Render basic error messages based on information passed from application.py-->
+    <div class="col">
+        <div class="jumbotron">
+            <h1 class="display-3">{{ error.code }}</h1>
+            <p class="lead">{{ error.name }}</p>
+            <hr class="my-4"/>
+            <p>{{ error.description }}</p>
+        </div>
+    </div>
+{% endblock %}

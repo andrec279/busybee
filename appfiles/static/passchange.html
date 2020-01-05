@@ -1,0 +1,42 @@
+<br>
+<div class="form-group">
+    <input class="form-control" id="newpass" name="newpassword" placeholder="New password" type="password" required>
+    <div class="invalid-feedback repasscheck" id='repassfeedback'>Please choose a new password</div>
+</div>
+<div class="form-group">
+    <input class="form-control" id='confirm' name="confirmation" placeholder="Confirm new password" type="password" required>
+    <div class="invalid-feedback repasscheck" id='reconfeedback'>Please confirm new password</div>
+</div>
+<button class="btn btn-outline-warning" type="submit">Set new password</button>
+
+<script>
+    // Validate user input as it is typed into the field, allowing styling of error msg upon submit
+    var newpass = document.getElementById('newpass');
+    var confirm = document.getElementById('confirm');
+    var pwform = document.getElementById('pw');
+
+    pwform.onkeyup = function() {
+        // Check and assign validity of form in real time
+
+        // Passwords don't match case
+        if (newpass.value !== confirm.value) {
+            newpass.setCustomValidity('no match');
+            confirm.setCustomValidity('no match');
+            $('div.repasscheck').html('Passwords must match');
+        }
+
+        // Both fields are empty case
+        else if (newpass.value === '' && confirm.value === '') {
+            newpass.setCustomValidity('empty field');
+            confirm.setCustomValidity('empty field');
+            $('#repassfeedback').html('Please choose a new password');
+            $('#reconfeedback').html('Please confirm new password');
+        }
+
+        // Valid case
+        else {
+            newpass.setCustomValidity('');
+            confirm.setCustomValidity('');
+        }
+    }
+</script>

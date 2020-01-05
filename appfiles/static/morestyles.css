@@ -1,0 +1,510 @@
+nav .navbar-brand
+{
+    /* size for brand */
+    font-size: x-large;
+}
+
+@media screen and (max-width: 345px)
+{
+    /* changes to interface when at mobile width*/
+    .logo {
+        display: none;
+    }
+}
+
+.navbar-toggler
+{
+    border-style: hidden;
+}
+
+.navbar-toggler .navbar-toggler-icon:hover
+{
+    transform: scale(1.1);
+    transition: 0.3s;
+}
+
+main .form-control
+{
+    /* center form controls */
+    display: inline-block;
+
+    /* override Bootstrap's 100% width for form controls */
+    width: auto;
+}
+
+main
+{
+    /* scroll horizontally as needed */
+    overflow-x: auto;
+
+    /* center contents */
+    text-align: center;
+
+    font-family: "Helvetica";
+    
+    margin-bottom: 30px;
+}
+
+main img
+{
+    /* constrain images on small screens */
+    max-width: 100%;
+}
+
+.header
+{
+    /*Stylize page headers*/
+    padding: 15px;
+    color: rgb(100, 100, 100);
+    font-family: "Helvetica";
+}
+
+.summary-head th
+{
+    /*Stylize index footer head*/
+    border-top: 1px solid black;
+}
+
+.jumbotron
+{
+  background-color: rgb(50,50,50);
+  border-radius: 0;
+  color: white;
+  padding: 35px;
+}
+
+.noStocks
+{
+    /*Stylize default index page when user doesn't own stocks*/
+    font-style: italic;
+    color: rgb(100, 100, 100);
+    height: 100px;
+    line-height: 100px;
+}
+
+.header-hr
+{
+    border: 0.5px solid white;
+    -webkit-animation: grow 2s;
+    animation: grow 2s;
+    -webkit-transform: scale(0); 
+    transform: scale(0);
+    -webkit-animation-fill-mode: forwards;
+    animation-fill-mode: forwards; /* Prevent close after the animation completes */
+    width: 85%;
+    max-width: 800px;
+}
+
+@-webkit-keyframes grow {
+    100% {
+        -webkit-transform: scale(1); 
+    }
+}
+
+@keyframes grow {
+    100% {
+        transform: scale(1); 
+    }
+}
+
+.header-msg-primary
+{
+    -webkit-animation: fadein 1s;
+    animation: fadein 1s;
+}
+
+.header-msg-secondary
+{
+    color: white;
+    -webkit-animation: fadein 1s;
+    animation: fadein 1s;
+}
+
+@-webkit-keyframes fadein {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+@keyframes fadein {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+
+.left
+{
+    /* For text and images only - for block elements add margin or float property */
+    text-align: left;
+    
+    padding-left: 50px;
+}
+
+.right
+{
+    text-align: right;
+}
+    
+.center
+{
+    margin: auto;
+    text-align: center;
+}
+
+.profile-img-title
+{
+    margin: auto;
+    text-align: center;
+    width: 200px;
+}
+
+.btn
+{
+    font-size: 1em;
+}
+
+.userdisplay-sm
+{
+    font-size: 2.5vh;  
+}
+
+.userdisplay-sm-w
+{
+    font-size: 2.3vw;
+}
+
+.userdisplay-md
+{
+    font-size: 3vh;
+}
+
+.userdisplay-md-w
+{
+    font-size: 4vw;
+}
+
+.userdisplay-md-lg
+{
+    font-size: 7vh;
+}
+
+.userdisplay-lg
+{
+    font-size: 10vh;
+}
+
+.userdisplay-lg-w
+{
+    font-size: 6vw;
+}
+
+.graybox
+{
+    margin: auto;
+    padding: 20px;
+    background-color: rgb(240, 240, 243);
+    border-radius: 5px;
+}
+
+.outlinebox1
+{
+    padding: 20px 0 20px 0;
+    margin: auto;
+    border-style: solid;
+    border-color: rgb(100, 100, 100);
+    background-color: rgb(250, 250, 253);
+    border-radius: 10px;
+}
+
+.outlinebox2
+{
+    padding: 20px 0 20px 0;
+    margin: auto;
+    border-style: solid;
+    border-color: rgb(100, 100, 100);
+    background-color: rgb(250, 250, 253);
+    border-radius: 0 0 10px 10px;
+}
+
+.outlinebox .flex
+{
+    display: flex;
+    padding: 20px;
+}
+
+#checkBoxContainer
+{
+    display: flex;
+}
+
+input
+{
+    position: relative;
+    vertical-align: middle;
+    margin: auto;
+}
+
+.banner
+{
+    padding: 20px 20px 20px 20px;
+    background-color: rgb(100, 100, 100);
+    color: white;
+    margin: 0 auto 0 auto;
+    border-radius: 10px 10px 0 0;
+    height: 20%;
+}
+
+.popUp /*Pop-up background*/
+{
+    display: none;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    position: fixed;
+    background-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.4);
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    padding-top: 100px;
+    overflow: auto;
+}
+
+.popUpContent
+{
+    position: relative;
+    background-color: rgb(240,240,240);
+    margin: auto;
+    padding-bottom: 20px;
+    border-style: none;
+    
+    border-radius: 10px;
+    font-size:0.9em;
+    width: 70%;
+    
+    /*Animate slide from top*/
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: .5s;
+    animation-name: animatetop;
+    animation-duration: .5s;
+}
+
+@keyframes animatetop {
+  from {top: -300px; opacity: 0;}
+  to {top: 0; opacity: 1;}
+}
+
+@-webkit-keyframes animatetop {
+  from {top: -300px; opacity: 0;}
+  to {top: 0; opacity: 1;}
+}
+
+#dynamicGoals
+{
+    text-align: center;
+}
+
+#openButton
+{
+    width: 80%;
+    transition: 0.7s;
+    animation: fadeDelay 3s;
+    animation-fill-mode: forwards;
+    max-width: 300px;
+    visibility: hidden;
+}
+
+@keyframes fadeDelay {
+  20% {
+    visibility: hidden;
+    opacity: 0;
+  }
+  100% {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+#openButton:hover
+{
+    transform: scale(1.05);
+}
+
+.goalItem
+{
+    background-color: rgb(230, 230, 230);
+    border-style: hidden;
+    padding: 10px 15px 10px 15px;
+    margin: 1px;
+    border-radius: 5px;
+    max-width: 700px;
+    transition: 0.7s;
+}
+
+.goalItem:hover
+{
+    transform: scale(1.05);
+    background-color: rgb(60, 60, 60);
+    color: white;
+    cursor: pointer;
+}
+
+.goalbutton
+{
+    width: 30%;
+}
+
+.form-control.popUpForm
+{
+    width: 80%;
+    max-width: 300px;
+    font-size: 0.9em;
+    height: 25px;
+}
+
+.form-control.popUpForm.newCat
+{
+    width: 50%;
+    height: 30px;
+}
+
+#newCatSave
+{
+    height: 35px;
+    margin: auto;
+}
+
+.hidden
+{
+    display: none;
+}
+
+.goalListItems
+{
+    margin: 5px;
+}
+
+.goalListItems .goalDeleteButton
+{
+    display: none;
+    float: right;
+    margin-left: 20px;
+}
+
+.goalDeleteButton:hover
+{
+    transform: scale(1.2);
+    font-weight: bold;
+}
+
+table
+{
+    margin: auto;
+}
+
+#tableTopRow
+{
+    border-bottom: solid;
+    border-width: 1px;
+}
+
+th, td
+{
+    padding: 5px 30px 5px 30px; 
+}
+
+#taskSave
+{
+    font-size: .5em;
+    height: 25px;
+}
+
+/* Styling for task counter table on home page */
+#completedLabel
+{
+    background-color: rgb(223,237,214);
+}
+
+#completedData
+{
+    background-color: rgb(197, 224, 180);
+}
+
+#inProgressLabel
+{
+    border-left-style: solid;
+    border-left-color: white;
+    border-left-width: 4px;
+    background-color: rgb(255, 242, 204);
+}
+
+#inProgressData
+{
+    background-color: rgb(255, 230, 152);
+}
+
+#chart2wrap
+{
+    margin: auto;
+    width: 80%;
+    height: 300px;
+}
+
+.task
+{
+    margin: auto;
+    border-radius: 7px;
+    width: 65%;
+    padding: 4px;
+}
+
+.task:hover
+{
+    background-color: rgb(180,180,180);
+    color: white;
+    transition: .3s;
+    cursor: pointer;
+}
+
+h2 
+{
+   width: 20%; 
+   text-align: center;
+   float: center;
+   margin: auto;
+   border-bottom: 1px solid white; 
+   line-height: 0.1em;
+   display: block;
+}
+
+h2 .goalEditButton 
+{ 
+    margin: auto;
+    background:rgb(100, 100, 100);
+    padding:0 10px;
+}
+
+.goalEditButton:hover 
+{
+    cursor: pointer;
+    padding: 0 20px;
+    font-weight: bold;
+    transition: 0.5s;
+}
+
+#goalUpdate 
+{
+    padding: 0;
+}
+
+.tableForm
+{
+    float: center;
+    margin: auto;
+    text-align: center;
+}
+
+.taskDeleteButton:hover
+{
+    transform: scale(1.2);
+    font-weight: bold;
+}
