@@ -17,6 +17,7 @@ from tempfile import mkdtemp
 import datetime
 from datetime import date, timedelta
 from collections import defaultdict
+import sqlalchemy
 
 """Initialize Flask"""
 app = Flask(__name__)
