@@ -1,4 +1,4 @@
 cloud_sql_connection_name: 'busybee-264219:us-east1:bbdb'
 db_user: 'root'
-db_password: 'Cube9vast>R'
+db_pass: 'Cube9vast>R'
 db_name: 'musedb'

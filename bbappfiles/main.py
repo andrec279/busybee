@@ -23,17 +23,35 @@ import sqlalchemy
 app = Flask(__name__)
 
 """Configure MySQL Database with Flask"""
-# Open yaml file containing db connection information
-db = yaml.load(open('db.yaml'))
+# Open yaml file containing db connection information (good practice for securing login info)
+dbvars = yaml.load(open('db.yaml'))
 
+'''Old way of instantiating database through TCP connection'''
 # Load yaml file information into server configuration parameters to connect to database
-app.config['MYSQL_HOST'] = db['mysql_host']
-app.config['MYSQL_USER'] = db['mysql_user']
-app.config['MYSQL_PASSWORD'] = db['mysql_password']
-app.config['MYSQL_DB'] = db['mysql_db']
+# app.config['MYSQL_HOST'] = dbvars['mysql_host']
+# app.config['MYSQL_USER'] = dbvars['mysql_user']
+# app.config['MYSQL_PASSWORD'] = dbvars['mysql_password']
+# app.config['MYSQL_DB'] = dbvars['mysql_db']
 
 # Instantiate database object and cursor
-mysql = MySQL(app)
+# mysql = MySQL(app)
+
+'''Using Unix Domain socket and SQLAlchemy Engine to instantiate database'''
+# Source: https://cloud.google.com/sql/docs/mysql/connect-app-engine
+dbsource = sqlalchemy.create_engine(
+    # Equivalent URL:
+    # mysql+pymysql://<db_user>:<db_pass>@/<db_name>?unix_socket=/cloudsql/<cloud_sql_instance_name>
+    sqlalchemy.engine.url.URL(
+        drivername="mysql+pymysql",
+        username=dbvars['db_user'],
+        password=dbvars['db_pass'],
+        database=dbvars['db_name'],
+        query={"unix_socket": "/cloudsql/{}".format(dbvars['cloud_sql_connection_name'])},
+    ),
+)
+
+# Global db variable to handle all SQL queries
+db = dbsource.connect()
 
 # Configure session to use filesystem (instead of signed cookies)
 app.secret_key = 'secret_key'
@@ -57,27 +75,17 @@ def after_request(response):
 @login_required
 def graph():
     # Data point: Number of completed vs. in progress tasks
-    completeCursor = mysql.connection.cursor()
-    completeCursor.execute("SELECT * FROM tasks WHERE id = %s AND completed = 1", [session["user_id"]])
-    completedCount = len(completeCursor.fetchall())
+    completedTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 1")
+    completedCount = len(db.execute(completed, user_id=session["user_id"]).fetchall())
     
-    progressCursor = completeCursor = mysql.connection.cursor()
-    progressCursor.execute("SELECT * FROM tasks WHERE id = %s AND completed = 0", [session["user_id"]])
-    progressCount = len(progressCursor.fetchall())
+    incompleteTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 0")
+    progressCount = len(db.execute(incompleteTaskQuery, user_id=session["user_id"]).fetchall())
     
-    completeCursor.close()
-    progressCursor.close()
-    
-    '''Graph data: taskCreations graph'''
-    dateGetCursor = mysql.connection.cursor()
-    dateGetCursor.execute("SELECT date_completed FROM tasks WHERE id = %s AND completed = 1", [session["user_id"]])
+    '''Graph setup: taskCreations graph'''
     completedDates = []
-    for item in dateGetCursor.fetchall():
-        # Extract dates from single-element tuple
-        for element in item:
-            completedDates.append(element)
-    
-    dateGetCursor.close()
+    for row in db.execute(completedTaskQuery, user_id=session["user_id"]).fetchall():
+        # Extract dates from position 5 in each completed task tuple
+        completedDates.append(row[5])
     
     formattedDates = []
     for date in completedDates:
@@ -85,23 +93,27 @@ def graph():
         dayNum = date.day
         formattedDates.append(monthName + " " + str(dayNum))
     
-    #Create list of consecutive dates over relevant range
+    # Create list of consecutive dates over relevant range
+    # Future Enhancement: Allow user to set these values through GET request
     dateMin = min(completedDates)
     dateMax = datetime.date.today()
     
     formattedDateAxisList = []
     dateAxisInterval = 1
         
+    # Fill formattedDateAxisList with dates ranging between dateMin and dateMax
     nextDate = dateMin
     while nextDate <= dateMax:
         formattedNextDate = (nextDate.strftime("%b") + " " + str(nextDate.day))        
         formattedDateAxisList.append(formattedNextDate)
         nextDate += timedelta(days=dateAxisInterval)
     
+    # Count occurrence of each date between min and max in formattedDates list
     taskCompleteCount = []
     for date in formattedDateAxisList:
         taskCompleteCount.append(formattedDates.count(date))
     
+    # Create formatted data structure for dates line graph
     taskCompleteDataDictList = []
     for i in range(len(taskCompleteCount)):
         taskCompleteDataDictList.append({'name': formattedDateAxisList[i], 'y': taskCompleteCount[i]})
@@ -116,7 +128,7 @@ def graph():
     xAxis1 = {"type": 'category'}
     
     
-    '''Graph data: categoriesBreakdown graph'''
+    '''Graph setup: categoriesBreakdown graph'''
     # Generate list of all unique category names from goals table
     catGetCursor = mysql.connection.cursor()
     catGetCursor.execute("SELECT * FROM goals WHERE id=%s", [session["user_id"]])
