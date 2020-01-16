@@ -84,7 +84,7 @@ def graph():
     '''Graph setup: taskCreations graph'''
     completedDates = []
     for row in db.execute(completedTaskQuery, user_id=session["user_id"]).fetchall():
-        # Extract dates from position 5 in each completed task tuple
+        # Extract completion dates from position 5 in each completed task tuple
         completedDates.append(row[5])
     
     formattedDates = []
@@ -130,9 +130,9 @@ def graph():
     
     '''Graph setup: categoriesBreakdown graph'''
     # Generate list of all unique category names from goals table
-    catGetCursor = mysql.connection.cursor()
-    catGetCursor.execute("SELECT * FROM goals WHERE id=%s", [session["user_id"]])
-    catData = catGetCursor.fetchall()
+    catGetQuery = sqlalchemy.text('SELECT * FROM goals WHERE id=:user_id')
+    catData = db.execute(catGetQuery, user_id=session["user_id"]).fetchall()
+    
     categoriesRawList = [row[2] for row in catData]
     uniqueCats = []
     for cat in categoriesRawList:
@@ -147,10 +147,8 @@ def graph():
         catFreqDictList.append(catFreqDict)
     
     # Generate list of all unique goal IDs from tasks table
-    goalGetCursor = mysql.connection.cursor()
-    goalGetCursor.execute("SELECT * FROM tasks WHERE id=%s", [session["user_id"]])
-    goalData = goalGetCursor.fetchall()
-    
+    goalGetQuery = sqlalchemy.text('SELECT * FROM tasks WHERE id=:user_id')
+    goalData = db.execute(goalGetQuery, user_id=session["user_id"]).fetchall()
     goalIDListRaw = [taskRow[1] for taskRow in goalData]
     
     
@@ -158,20 +156,22 @@ def graph():
     goalIDDict = {}
     for goalIDRow in catData:
         goalIDDict.update({goalIDRow[1] : goalIDRow[4]})
+        # Format of goalIDDict: {'GoalName1' : pk_col1, 'GoalName2' : pk_col2}
     
-    # Create dictionary mapping list goals to their category - will feed this into 2nd dataset
+    # Create dictionary mapping list goals to their category - defaultdict allows creation of key-value pair if it doesn't exist yet
     categoryGoalDict = defaultdict(list)
+    
     for row in catData:
-        # Categories are keys, lists of lists containing goals are values
+        # For each row, append the goal to the list of goals (value) that correspond to the category (key)
         categoryGoalDict[row[2]].append([row[1]])
-        # Example output after loop: [{Fitness : [[Deadlift], [Run]]}, {Career : [[Finish CS50 App], [Learn New Language]]}]
+        # Format of categoryGoalDict: [{Category1 : [[GoalName1], [GoalName2]]}, {Category2 : [[GoalName3], [GoalName4]]}]
     
     # Add count of each goal to list within list within each dict value
     for category in categoryGoalDict:
         for goal in categoryGoalDict[category]:
-            # Data point is percentage of category that goal makes up - divide number of tasks in goal by total tasks in category
             goal.append(goalIDListRaw.count(goalIDDict[goal[0]]))
-    
+            # Format of categoryGoalDict: [{Category1 : [[GoalName1, count], [GoalName2, count]]}, {Category2 : [[GoalName3, count], [GoalName4, count]]}]
+
     # Create 2nd dataset by pulling the appropriate data list from previously defined data dictionary
     categoryGoalDictList = []
     for category in categoryGoalDict:
@@ -212,13 +212,10 @@ def login():
         # Ensure password was submitted
         elif not request.form.get("password"):
             abort(403, "Must provide password")
-        
-        loginCursor = mysql.connection.cursor()
-        loginCursor.execute("SELECT * FROM users WHERE username = %s", [request.form.get("username")])
-        
+    
         # Query database for username
-        userRow = loginCursor.fetchone()
-        loginCursor.close()
+        loginQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+        userRow = db.execute(loginQuery, username=request.form.get("username")).fetchone()
 
         # Ensure username exists and password is correct
         if userRow is None or not check_password_hash(userRow[2], request.form.get("password")):
@@ -247,8 +244,8 @@ def register():
         confirmation = request.form.get("confirmation")
         created = datetime.date.today()
         
-        URcursor = mysql.connection.cursor()
-        URcursor.execute("SELECT * FROM users WHERE username = %s", [username])
+        URQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+        db.execute(URQuery, username=username)
         
         if not request.form.get("username") or not request.form.get("password"):
             abort(400, "Must enter valid username and/or password")
@@ -259,23 +256,16 @@ def register():
         # Check if new username matches existing usernames in database by counting number of matches - reject if count > 0
         elif request.form.get("password") != request.form.get("confirmation"):
             abort(400, "Passwords must match")
-
-        URcursor.close()
         
         # Insert successfully registered new user into users database
-        insertCursor = mysql.connection.cursor()
+        insertUserQuery = sqlalchemy.text('INSERT INTO users (username,hashpass,picture,created) VALUES (:username, :hashpass, :defaultpic, :created)')
         hashPass = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
-        insertCursor.execute("INSERT INTO users (username,hashpass,picture,created) VALUES (%s, %s, %s, %s)",
-                   (username, hashPass, defaultPic, created))
-        insertCursor.connection.commit()
-        insertCursor.close()
+        db.execute(insertUserQuery, username=username, hashpass=hashPass, defaultpic=defaultPic, created=created)
         
         # Keep user logged in after registration
-        SessCursor = mysql.connection.cursor()
-        SessCursor.execute("SELECT * FROM users WHERE username=%s", [username])
-        userRow = SessCursor.fetchone()
+        SessQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+        userRow = db.execute(SessQuery, username=username).fetchone()
         session["user_id"] = userRow[0]
-        SessCursor.close()
 
         flash("Registered!")
         return redirect("/")
@@ -287,14 +277,11 @@ def register():
 
 @app.route("/check", methods=["GET"])
 def check():
-    """Return true if username available, else false, in JSON format"""
+    """Return true if username available, else false, in JSON format to enable JS client-side handling of repeat usernames upon registration"""
 
     username = request.args.get("username")
-    checkCursor = mysql.connection.cursor()
-    checkCursor.execute("SELECT username FROM users WHERE username = %s", [username])
-    checkResult = checkCursor.fetchone()
-    
-    checkCursor.close()
+    checkNameQuery = sqlalchemy.text('SELECT username FROM users WHERE username = :username')
+    checkResult = db.execute(checkNameQuery, username=username).fetchone()
     
     # False case: username is already in database
     if not username or (len(username) >= 1 and checkResult is not None):
@@ -316,47 +303,31 @@ def planning():
         deadline = request.form.get("datePicker")
         
         # Write object values into database
-        goalWriteCursor = mysql.connection.cursor()
-        goalWriteCursor.execute("""INSERT INTO goals (id, goalname, category, deadline)
-                                VALUES (%s, %s, %s, %s)""", [session["user_id"], goal, category, deadline]) 
-        goalWriteCursor.connection.commit()
-        goalWriteCursor.close()
+        goalWriteQuery = sqlalchemy.text('''INSERT INTO goals (id, goalname, category, deadline) 
+                                         VALUES (:user_id, :goal, :category, :deadline)''')
+        db.execute(goalWriteQuery, user_id=session["user_id"], goal=goal, category=category, deadline=deadline)
         
         return redirect("/planning")
     
     else:    
-        
-        # Initialize cursor to pull entries from goals SQL table
-        goalDisplayCursor = mysql.connection.cursor()
-        
-        # Select all goals created by user and instantiate list of rows returned
-        goalDisplayCursor.execute("SELECT * from goals WHERE id = %s", [session["user_id"]])
-        rows = list(goalDisplayCursor.fetchall())
 
-        # Create list of goal names
-        goals = []
+        # Select all goals created by user and instantiate list of rows returned
+        goalDisplayQuery = sqlalchemy.text('SELECT * from goals WHERE id=:user_id')
+        rows = list(db.execute(goalDisplayQuery, user_id=session["user_id"]).fetchall())
+
+        # Create dictionary to store unique goal names, goal id's and goal categories
+        goalDict = {'goals': [], 'goalids': [], 'categories': []}
         for row in rows:
-            goals.append(row[1])
-        
-        # Create list of goal pk id's (NEED TO ADD DATA VALIDATION FOR GOALS)
-        goalids = []
-        for row in rows:
-            goalids.append(row[4])
+            goalDict['goals'].append(row[1])
+            goalDict['goalids'].append(row[4])
             
-        # Create list of unique categories
-        categories = []
-        for row in rows:
-            if row[2] not in categories:
-                categories.append(row[2])
-                
-        goalDisplayCursor.close()
+            # Goal categories can be repeated in database, sort uniq
+            if row[2] not in goalDict['categories']:
+                goalDict['categories'].append(row[2])
         
         # Pull all tasks from database
-        taskDisplayCursor = mysql.connection.cursor()
-        taskDisplayCursor.execute("SELECT * from tasks WHERE id = %s", [session["user_id"]])
-        taskrows = list(taskDisplayCursor.fetchall())
-        
-        taskDisplayCursor.close()
+        taskDisplayQuery = sqlalchemy.text('SELECT * from tasks WHERE id = :user_id')
+        taskrows = list(db.execute(taskDisplayQuery, user_id=session["user_id"]).fetchall())
         
         return render_template("planning.html", goals=goals, categories=categories, goalids=goalids, rows=rows, taskrows=taskrows)
 
@@ -370,17 +341,13 @@ def createtask():
     goal_id = request.args.get("goalID")
     taskName = request.args.get("taskName")
     
-    taskInsertCursor = mysql.connection.cursor()
-    taskInsertCursor.execute("""INSERT INTO tasks (id, goalID, taskname, date_created)
-                             VALUES (%s,%s,%s,%s)""", [session["user_id"], goal_id, taskName, datetime.date.today()])
-    taskInsertCursor.connection.commit()
+    taskInsertQuery = sqlalchemy.text("""INSERT INTO tasks (id, goalID, taskname, date_created)
+                             VALUES (:user_id, :goalID, :taskname, :date_created)""")
+    db.execute(taskInsertQuery, user_id=session["user_id"], goalID=goal_id, taskname=taskName, date_created=datetime.date.today())
     
     # Retrieve id of newly created task
-    taskInsertCursor.execute("""SELECT taskID FROM tasks WHERE goalID = %s
-                             AND taskname = %s""", [goal_id, taskName])
-    task_id = taskInsertCursor.fetchall()
-
-    taskInsertCursor.close()
+    taskIDGetQuery = sqlalchemy.text('SELECT taskID FROM tasks WHERE goalID = :goalID AND taskname = :taskname')
+    task_id = db.execute(taskIDGetQuery, goalID=goal_id, taskname=taskName).fetchall()
     
     return jsonify(task_id)
 
@@ -396,44 +363,37 @@ def goalupdate():
         categoryName = request.form.get('goalDisplayCat')
         deadline = request.form.get('goalDisplayDate')
 
-        goalsUpdateCursor = mysql.connection.cursor()
-        goalsUpdateCursor.execute('''UPDATE goals SET goalname=%s, category=%s, deadline=%s
-                                  WHERE pk_col=%s''', [goalName, categoryName, deadline, goalID])
+        goalsUpdateStmnt = sqlalchemy.text('''UPDATE goals SET goalname=:goalName, 
+                                           category=:categoryName, deadline=:deadline WHERE pk_col=:goalID''')
+        db.execute(goalsUpdateStmnt, goalName=goalName, categoryName=categoryName, deadline=deadline, goalID=goalID)
 
         # Read new task names and apply changes for corresponding taskID
         taskIDs = request.form.getlist('updatedTaskIDs')
         updatedTaskNames = request.form.getlist('taskname')
-        taskNameUpdateCursor = mysql.connection.cursor()
+        taskNameUpdateStmnt = sqlalchemy.text('UPDATE tasks SET taskname=:taskname WHERE taskid=:taskid')
 
         for n in range(len(updatedTaskNames)):
-            taskNameUpdateCursor.execute('''UPDATE tasks SET taskname=%s 
-                                         WHERE taskid=%s''', [updatedTaskNames[n], taskIDs[n]])
+            taskNameUpdateCursor.execute(taskNameUpdateStmnt, taskname=updatedTaskNames[n], taskid=taskIDs[n])
 
     # Get id's of checked tasks from checkedTaskList input forms
     checkedTaskList = request.form.getlist('checkeditem')
     uncheckedTaskList = request.form.getlist('uncheckeditem')
     
     # Update tasks to checked in tasks database for each matching id
-    taskUpdateCursor = mysql.connection.cursor()
-    taskReadCursor = mysql.connection.cursor()
+    taskReadQuery = sqlalchemy.text('SELECT completed FROM tasks WHERE taskID = :checkedTaskID')
+    checkedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=1, date_completed=:today WHERE taskID=:checkedTaskID')
+    uncheckedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=0, date_completed=NULL WHERE taskID = :uncheckedTaskID')
     
     for checked_task_id in checkedTaskList:
         ''' Update completed tasks and add completed date '''
        
         # Ensure updates are only made to tasks that were previously uncompleted, leave already completed ones alone
-        taskReadCursor.execute('''SELECT completed FROM tasks WHERE taskID = %s''', [checked_task_id])
-        if taskReadCursor.fetchone() == (0,):
-            taskUpdateCursor.execute('''UPDATE tasks SET completed=1, date_completed=%s
-                                     WHERE taskID = %s''', [datetime.date.today(), checked_task_id])
+        if db.execute(taskReadQuery, checkedTaskID=checked_task_id).fetchone() == (0,):
+            db.execute(checkedTaskUpdateStmnt, today=datetime.date.today(), taskID=checked_task_id)
         
     for unchecked_task_id in uncheckedTaskList:
         # Update unchecked tasks and delete completed date
-        taskUpdateCursor.execute('''UPDATE tasks SET completed=0, date_completed=NULL
-                                 WHERE taskID = %s''', [unchecked_task_id])
-    
-    taskUpdateCursor.connection.commit()
-    taskUpdateCursor.close()
-    taskReadCursor.close()
+        taskUpdateCursor.execute(uncheckedTaskUpdateStmnt, uncheckedTaskID=unchecked_task_id])
     
     return redirect('/planning')
     
