@@ -1,7 +1,8 @@
 import os
+import logging
 
 """Import flask framework functions to set up server-side functionality"""
-from flask import Flask, flash, jsonify, request, session, redirect, render_template, abort
+from flask import Flask, flash, jsonify, request, session, redirect, render_template, abort, Response
 from flask_session import Session
 
 """Werkzeug: Password hashing and error handling"""
@@ -21,6 +22,7 @@ import sqlalchemy
 
 """Initialize Flask"""
 app = Flask(__name__)
+logger = logging.getLogger()
 
 """Configure MySQL Database with Flask"""
 # Open yaml file containing db connection information (good practice for securing login info)
@@ -50,9 +52,6 @@ dbsource = sqlalchemy.create_engine(
     ),
 )
 
-# Global db variable to handle all SQL queries
-db = dbsource.connect()
-
 # Configure session to use filesystem (instead of signed cookies)
 app.secret_key = 'secret_key'
 app.config["SESSION_FILE_DIR"] = mkdtemp()
@@ -75,17 +74,25 @@ def after_request(response):
 @login_required
 def graph():
     # Data point: Number of completed vs. in progress tasks
-    completedTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 1")
-    completedCount = len(db.execute(completed, user_id=session["user_id"]).fetchall())
-    
-    incompleteTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 0")
-    progressCount = len(db.execute(incompleteTaskQuery, user_id=session["user_id"]).fetchall())
-    
-    '''Graph setup: taskCreations graph'''
-    completedDates = []
-    for row in db.execute(completedTaskQuery, user_id=session["user_id"]).fetchall():
-        # Extract completion dates from position 5 in each completed task tuple
-        completedDates.append(row[5])
+    try:
+        with dbsource.connect() as conn:
+            completedTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 1")
+            completedCount = len(conn.execute(completedTaskQuery, user_id=session["user_id"]).fetchall())
+            
+            incompleteTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 0")
+            progressCount = len(conn.execute(incompleteTaskQuery, user_id=session["user_id"]).fetchall())
+        
+            '''Graph setup: taskCreations graph'''
+            completedDates = []
+            for row in conn.execute(completedTaskQuery, user_id=session["user_id"]).fetchall():
+                # Extract completion dates from position 5 in each completed task tuple
+                completedDates.append(row[5])
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status=500,
+            response="completedTaskQuery or incompleteTaskQuery failure"
+        )
     
     formattedDates = []
     for date in completedDates:
@@ -130,9 +137,17 @@ def graph():
     
     '''Graph setup: categoriesBreakdown graph'''
     # Generate list of all unique category names from goals table
-    catGetQuery = sqlalchemy.text('SELECT * FROM goals WHERE id=:user_id')
-    catData = db.execute(catGetQuery, user_id=session["user_id"]).fetchall()
-    
+    try:
+        with dbsource.connect() as conn:
+            catGetQuery = sqlalchemy.text('SELECT * FROM goals WHERE id=:user_id')
+            catData = conn.execute(catGetQuery, user_id=session["user_id"]).fetchall()
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status=500,
+            response="catGetQuery failure"
+        )
+
     categoriesRawList = [row[2] for row in catData]
     uniqueCats = []
     for cat in categoriesRawList:
@@ -147,10 +162,17 @@ def graph():
         catFreqDictList.append(catFreqDict)
     
     # Generate list of all unique goal IDs from tasks table
-    goalGetQuery = sqlalchemy.text('SELECT * FROM tasks WHERE id=:user_id')
-    goalData = db.execute(goalGetQuery, user_id=session["user_id"]).fetchall()
-    goalIDListRaw = [taskRow[1] for taskRow in goalData]
-    
+    try:
+        with dbsource.connect() as conn:
+            goalGetQuery = sqlalchemy.text('SELECT * FROM tasks WHERE id=:user_id')
+            goalData = conn.execute(goalGetQuery, user_id=session["user_id"]).fetchall()
+            goalIDListRaw = [taskRow[1] for taskRow in goalData]
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status = 500,
+            response = "goalGetQuery failure"
+        )
     
     # Map goals to their in-table primary keys in a dictionary to make goals countable
     goalIDDict = {}
@@ -214,15 +236,23 @@ def login():
             abort(403, "Must provide password")
     
         # Query database for username
-        loginQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
-        userRow = db.execute(loginQuery, username=request.form.get("username")).fetchone()
+        try:
+            with dbsource.connect() as conn:
+                loginQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+                userRow = conn.execute(loginQuery, username=request.form.get("username")).fetchone()
 
-        # Ensure username exists and password is correct
-        if userRow is None or not check_password_hash(userRow[2], request.form.get("password")):
-            abort(403, "Invalid username or password")
+                # Ensure username exists and password is correct
+                if userRow is None or not check_password_hash(userRow[2], request.form.get("password")):
+                    abort(403, "Invalid username or password")
 
-        # Remember which user has logged in
-        session["user_id"] = userRow[0]
+                # Remember which user has logged in
+                session["user_id"] = userRow[0]
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "loginQuery failure"
+            )
 
         # Redirect user to home page
         flash("Login successful!")
@@ -244,28 +274,45 @@ def register():
         confirmation = request.form.get("confirmation")
         created = datetime.date.today()
         
-        URQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
-        db.execute(URQuery, username=username)
+        try:
+            with dbsource.connect() as conn:
+                userExistsQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+                preexistingUsernames = conn.execute(userExistsQuery, username=username).fetchone()
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "UserExistsQuery failure"
+            )
         
+        '''Username/password validation. Ideally the last stopgap, validation is also performed in JS'''
         if not request.form.get("username") or not request.form.get("password"):
             abort(400, "Must enter valid username and/or password")
             
-        elif URcursor.fetchone() is not None:
+        elif preexistingUsernames is not None:
             abort(400, "Username is taken")
             
         # Check if new username matches existing usernames in database by counting number of matches - reject if count > 0
-        elif request.form.get("password") != request.form.get("confirmation"):
+        elif password != confirmation:
             abort(400, "Passwords must match")
         
         # Insert successfully registered new user into users database
-        insertUserQuery = sqlalchemy.text('INSERT INTO users (username,hashpass,picture,created) VALUES (:username, :hashpass, :defaultpic, :created)')
-        hashPass = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
-        db.execute(insertUserQuery, username=username, hashpass=hashPass, defaultpic=defaultPic, created=created)
-        
-        # Keep user logged in after registration
-        SessQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
-        userRow = db.execute(SessQuery, username=username).fetchone()
-        session["user_id"] = userRow[0]
+        try:
+            with dbsource.connect() as conn:
+                insertUserQuery = sqlalchemy.text('INSERT INTO users (username,hashpass,picture,created) VALUES (:username, :hashpass, :defaultpic, :created)')
+                hashPass = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+                conn.execute(insertUserQuery, username=username, hashpass=hashPass, defaultpic=defaultPic, created=created)
+            
+                # Keep user logged in after registration
+                SessQuery = sqlalchemy.text('SELECT * FROM users WHERE username=:username')
+                userRow = conn.execute(SessQuery, username=username).fetchone()
+                session["user_id"] = userRow[0]
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "insertUserQuery or SessQuery failure"
+            )
 
         flash("Registered!")
         return redirect("/")
@@ -280,9 +327,17 @@ def check():
     """Return true if username available, else false, in JSON format to enable JS client-side handling of repeat usernames upon registration"""
 
     username = request.args.get("username")
-    checkNameQuery = sqlalchemy.text('SELECT username FROM users WHERE username = :username')
-    checkResult = db.execute(checkNameQuery, username=username).fetchone()
-    
+    try:
+        with dbsource.connect() as conn:
+            checkNameQuery = sqlalchemy.text('SELECT username FROM users WHERE username = :username')
+            checkResult = conn.execute(checkNameQuery, username=username).fetchone()
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status = 500,
+            response = "checkNameQuery failure"
+        )
+
     # False case: username is already in database
     if not username or (len(username) >= 1 and checkResult is not None):
         return jsonify(False)
@@ -303,31 +358,46 @@ def planning():
         deadline = request.form.get("datePicker")
         
         # Write object values into database
-        goalWriteQuery = sqlalchemy.text('''INSERT INTO goals (id, goalname, category, deadline) 
-                                         VALUES (:user_id, :goal, :category, :deadline)''')
-        db.execute(goalWriteQuery, user_id=session["user_id"], goal=goal, category=category, deadline=deadline)
-        
+        try:
+            with dbsource.connect() as conn:
+                goalWriteStmnt = sqlalchemy.text('''INSERT INTO goals (id, goalname, category, deadline) 
+                                                VALUES (:user_id, :goal, :category, :deadline)''')
+                conn.execute(goalWriteStmnt, user_id=session["user_id"], goal=goal, category=category, deadline=deadline)
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "goalWriteStmnt failure"
+            )        
         return redirect("/planning")
     
     else:    
 
         # Select all goals created by user and instantiate list of rows returned
-        goalDisplayQuery = sqlalchemy.text('SELECT * from goals WHERE id=:user_id')
-        rows = list(db.execute(goalDisplayQuery, user_id=session["user_id"]).fetchall())
+        try:
+            with dbsource.connect() as conn:
+                goalDisplayQuery = sqlalchemy.text('SELECT * from goals WHERE id=:user_id')
+                rows = list(conn.execute(goalDisplayQuery, user_id=session["user_id"]).fetchall())
 
-        # Create dictionary to store unique goal names, goal id's and goal categories
-        goalDict = {'goals': [], 'goalids': [], 'categories': []}
-        for row in rows:
-            goalDict['goals'].append(row[1])
-            goalDict['goalids'].append(row[4])
-            
-            # Goal categories can be repeated in database, sort uniq
-            if row[2] not in goalDict['categories']:
-                goalDict['categories'].append(row[2])
-        
-        # Pull all tasks from database
-        taskDisplayQuery = sqlalchemy.text('SELECT * from tasks WHERE id = :user_id')
-        taskrows = list(db.execute(taskDisplayQuery, user_id=session["user_id"]).fetchall())
+                # Create dictionary to store unique goal names, goal id's and goal categories
+                goalDict = {'goals': [], 'goalids': [], 'categories': []}
+                for row in rows:
+                    goalDict['goals'].append(row[1])
+                    goalDict['goalids'].append(row[4])
+                    
+                    # Goal categories can be repeated in database, sort uniq
+                    if row[2] not in goalDict['categories']:
+                        goalDict['categories'].append(row[2])
+                
+                # Pull all tasks from database
+                taskDisplayQuery = sqlalchemy.text('SELECT * from tasks WHERE id = :user_id')
+                taskrows = list(conn.execute(taskDisplayQuery, user_id=session["user_id"]).fetchall())
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "goalDisplayQuery or TaskDisplayQuery failure"
+            )
         
         return render_template("planning.html", goals=goals, categories=categories, goalids=goalids, rows=rows, taskrows=taskrows)
 
@@ -341,14 +411,22 @@ def createtask():
     goal_id = request.args.get("goalID")
     taskName = request.args.get("taskName")
     
-    taskInsertQuery = sqlalchemy.text("""INSERT INTO tasks (id, goalID, taskname, date_created)
-                             VALUES (:user_id, :goalID, :taskname, :date_created)""")
-    db.execute(taskInsertQuery, user_id=session["user_id"], goalID=goal_id, taskname=taskName, date_created=datetime.date.today())
-    
-    # Retrieve id of newly created task
-    taskIDGetQuery = sqlalchemy.text('SELECT taskID FROM tasks WHERE goalID = :goalID AND taskname = :taskname')
-    task_id = db.execute(taskIDGetQuery, goalID=goal_id, taskname=taskName).fetchall()
-    
+    try:
+        with dbsource.connect() as conn:
+            taskInsertStmnt = sqlalchemy.text("""INSERT INTO tasks (id, goalID, taskname, date_created)
+                                    VALUES (:user_id, :goalID, :taskname, :date_created)""")
+            conn.execute(taskInsertStmnt, user_id=session["user_id"], goalID=goal_id, taskname=taskName, date_created=datetime.date.today())
+            
+            # Retrieve id of newly created task
+            taskIDGetQuery = sqlalchemy.text('SELECT taskID FROM tasks WHERE goalID = :goalID AND taskname = :taskname')
+            task_id = conn.execute(taskIDGetQuery, goalID=goal_id, taskname=taskName).fetchall()
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status = 500,
+            response = "taskInsertQuery or taskIDGetQuery failure"
+        )
+
     return jsonify(task_id)
 
 @app.route("/goalupdate", methods=["POST"])
@@ -363,37 +441,57 @@ def goalupdate():
         categoryName = request.form.get('goalDisplayCat')
         deadline = request.form.get('goalDisplayDate')
 
-        goalsUpdateStmnt = sqlalchemy.text('''UPDATE goals SET goalname=:goalName, 
-                                           category=:categoryName, deadline=:deadline WHERE pk_col=:goalID''')
-        db.execute(goalsUpdateStmnt, goalName=goalName, categoryName=categoryName, deadline=deadline, goalID=goalID)
+        try:
+            with dbsource.connect() as conn:
+                goalsUpdateStmnt = sqlalchemy.text('''UPDATE goals SET goalname=:goalName, 
+                                                category=:categoryName, deadline=:deadline WHERE pk_col=:goalID''')
+                conn.execute(goalsUpdateStmnt, goalName=goalName, categoryName=categoryName, deadline=deadline, goalID=goalID)
 
-        # Read new task names and apply changes for corresponding taskID
-        taskIDs = request.form.getlist('updatedTaskIDs')
-        updatedTaskNames = request.form.getlist('taskname')
-        taskNameUpdateStmnt = sqlalchemy.text('UPDATE tasks SET taskname=:taskname WHERE taskid=:taskid')
+                # Read new task names and apply changes for corresponding taskID
+                taskIDs = request.form.getlist('updatedTaskIDs')
+                updatedTaskNames = request.form.getlist('taskname')
+                taskNameUpdateStmnt = sqlalchemy.text('UPDATE tasks SET taskname=:taskname WHERE taskid=:taskid')
 
-        for n in range(len(updatedTaskNames)):
-            taskNameUpdateCursor.execute(taskNameUpdateStmnt, taskname=updatedTaskNames[n], taskid=taskIDs[n])
-
+                for n in range(len(updatedTaskNames)):
+                    conn.execute(taskNameUpdateStmnt, taskname=updatedTaskNames[n], taskid=taskIDs[n])
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "goalsUpdateStmnt or taskNameUpdateStmnt failure"
+            )
+    
+    '''Update checked / unchecked tasks in tasks database for each matching id after user save'''
     # Get id's of checked tasks from checkedTaskList input forms
     checkedTaskList = request.form.getlist('checkeditem')
     uncheckedTaskList = request.form.getlist('uncheckeditem')
     
-    # Update tasks to checked in tasks database for each matching id
-    taskReadQuery = sqlalchemy.text('SELECT completed FROM tasks WHERE taskID = :checkedTaskID')
-    checkedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=1, date_completed=:today WHERE taskID=:checkedTaskID')
-    uncheckedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=0, date_completed=NULL WHERE taskID = :uncheckedTaskID')
-    
     for checked_task_id in checkedTaskList:
-        ''' Update completed tasks and add completed date '''
-       
-        # Ensure updates are only made to tasks that were previously uncompleted, leave already completed ones alone
-        if db.execute(taskReadQuery, checkedTaskID=checked_task_id).fetchone() == (0,):
-            db.execute(checkedTaskUpdateStmnt, today=datetime.date.today(), taskID=checked_task_id)
-        
+        try:
+            with dbsource.connect() as conn:
+                # Ensure updates are only made to tasks that were previously uncompleted, this way I preserve completion dates for previously completed
+                taskReadQuery = sqlalchemy.text('SELECT completed FROM tasks WHERE taskID = :checkedTaskID')
+                checkedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=1, date_completed=:today WHERE taskID=:checkedTaskID')
+                if conn.execute(taskReadQuery, checkedTaskID=checked_task_id).fetchone() == (0,):
+                    conn.execute(checkedTaskUpdateStmnt, today=datetime.date.today(), taskID=checked_task_id)
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "taskReadQuery or checkedTaskUpdateStmnt"
+            )        
     for unchecked_task_id in uncheckedTaskList:
-        # Update unchecked tasks and delete completed date
-        taskUpdateCursor.execute(uncheckedTaskUpdateStmnt, uncheckedTaskID=unchecked_task_id])
+        try:
+            with dbsource.connect() as conn:
+                # Update unchecked tasks and set completed date to NULL
+                uncheckedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=0, date_completed=NULL WHERE taskID=:uncheckedTaskID')
+                conn.execute(uncheckedTaskUpdateStmnt, uncheckedTaskID=unchecked_task_id)
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "uncheckedTaskUpdateStmnt failure"
+            )
     
     return redirect('/planning')
     
@@ -404,18 +502,32 @@ def delete():
     """Find goal row corresponding to id from GET and remove from database"""
     if request.args.get("goalID"):
         goalID = request.args.get("goalID")
-        goalDeleteCursor = mysql.connection.cursor()
-        goalDeleteCursor.execute("DELETE FROM goals WHERE pk_col = %s", [goalID])
-        goalDeleteCursor.connection.commit()
-        goalDeleteCursor.close()
-        return redirect("/planning")
+        
+        try:
+            with dbsource.connect() as conn:
+                goalDeleteStmt = sqlalchemy.text("DELETE FROM goals WHERE pk_col = :goalID")
+                conn.execute(goalDeleteStmt, goalID=goalID)
+                return redirect("/planning")
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "goalDeleteStmt failure"
+            )
     
     elif request.args.get("taskID"):
         taskID = request.args.get("taskID")
-        taskDeleteCursor = mysql.connection.cursor()
-        taskDeleteCursor.execute("DELETE FROM tasks WHERE taskID = %s", [taskID])
-        taskDeleteCursor.connection.commit()
-        taskDeleteCursor.close()
+
+        try:
+            with dbsource.connect() as conn:
+                taskDeleteStmnt = sqlalchemy.text("DELETE FROM tasks WHERE taskID = :taskID")
+                conn.execute(taskDeleteStmnt, taskID=taskID)
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "taskDeleteStmnt failure"
+            )
         return redirect("/planning")
 
 
@@ -423,10 +535,16 @@ def delete():
 @login_required
 def profile():
     """Display user info and allow user to change their password or add funds"""
-    userCursor = mysql.connection.cursor()
-    userCursor.execute("SELECT * from users WHERE id = %s", [session["user_id"]])
-    userRow = userCursor.fetchone()
-    userCursor.close()
+    try:
+        with dbsource.connect() as conn:
+            userInfoQuery = sqlalchemy.text("SELECT * from users WHERE id = :user_id")
+            userRow = conn.execute(userInfoQuery, user_id=session["user_id"]).fetchone()
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status = 500,
+            response = "userInfoQuery failure"
+        )
     
     # Get username, proPic, and profile age from session user row
     username = userRow[1]
@@ -438,16 +556,23 @@ def profile():
 @app.route("/profilechange", methods=["POST"])
 @login_required
 def profilechange():
-    """Allow user to change profile picture and password in database"""
+    """Allow user to change profile picture and password in database.
+    User can change either, none, or both features of their profile."""
     
     #Get picture URL from hidden text field in profile and store in database
     if request.form.get("picURL"):
         proPic = request.form.get("picURL")
         # Update user profile picture in database
-        picCursor = mysql.connection.cursor()
-        picCursor.execute("UPDATE users SET picture= %s WHERE id= %s", [proPic, session["user_id"]])
-        picCursor.connection.commit()
-        picCursor.close()
+        try:
+            with dbsource.connect() as conn:
+                picUpdateStmnt = sqlalchemy.text("UPDATE users SET picture=:proPic WHERE id=:user_id")
+                conn.execute(picUpdateStmnt, proPic=proPic, user_id=session["user_id"])
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "picUpdateStmnt failure"
+            )
         
         flash("Profile picture saved!")
         return redirect("/profile")
@@ -456,10 +581,16 @@ def profilechange():
         newpass = request.form.get("newpassword")
         hashpass = generate_password_hash(newpass, method='pbkdf2:sha256', salt_length=8)
         
-        passCursor = mysql.connection.cursor()
-        passCursor.execute("UPDATE users SET hashpass=%s WHERE id=%s", [hashpass, session["user_id"]])
-        passCursor.connection.commit()
-        passCursor.close()
+        try:
+            with dbsource.connect() as conn:
+                passUpdateStmnt = sqlalchemy.text("UPDATE users SET hashpass=:hashpass WHERE id=:user_id")
+                conn.execute(passUpdateStmnt, [hashpass, session["user_id"]])
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 500,
+                response = "passUpdateStmnt"
+            )
         
         flash("Password changed!")
         return redirect("/profile")
