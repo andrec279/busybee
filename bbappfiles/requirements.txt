@@ -6,4 +6,5 @@ mysql
 mysql.connector
 requests
 pyyaml
-SQLAlchemy
+sqlalchemy
+pymysql

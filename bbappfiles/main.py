@@ -24,8 +24,7 @@ import sqlalchemy
 app = Flask(__name__)
 logger = logging.getLogger()
 
-"""Configure MySQL Database with Flask"""
-# Open yaml file containing db connection information (good practice for securing login info)
+"""Store db connection components in separate .yaml file (good practice for securing login info)"""
 dbvars = yaml.load(open('db.yaml'))
 
 '''Old way of instantiating database through TCP connection'''
@@ -38,8 +37,11 @@ dbvars = yaml.load(open('db.yaml'))
 # Instantiate database object and cursor
 # mysql = MySQL(app)
 
-'''Using Unix Domain socket and SQLAlchemy Engine to instantiate database'''
-# Source: https://cloud.google.com/sql/docs/mysql/connect-app-engine
+'''IMPORTANT - Instantiates connection from GAE to CloudSQL database via built-in CloudSQL proxy accessed through
+Unix Domain socket. Source: https://cloud.google.com/sql/docs/mysql/connect-app-engine (public IP)'''
+
+#db_socket_dir = os.environ.get("DB_SOCKET_DIR", "/cloudsql")
+cloud_sql_connection_name = dbvars['cloud_sql_connection_name']
 dbsource = sqlalchemy.create_engine(
     # Equivalent URL:
     # mysql+pymysql://<db_user>:<db_pass>@/<db_name>?unix_socket=/cloudsql/<cloud_sql_instance_name>
@@ -48,7 +50,7 @@ dbsource = sqlalchemy.create_engine(
         username=dbvars['db_user'],
         password=dbvars['db_pass'],
         database=dbvars['db_name'],
-        query={"unix_socket": "/cloudsql/{}".format(dbvars['cloud_sql_connection_name'])},
+        query={"unix_socket": "/cloudsql/{}".format(cloud_sql_connection_name)},
     ),
 )
 
@@ -90,7 +92,7 @@ def graph():
     except Exception as e:
         logger.exception(e)
         return Response(
-            status=500,
+            status=501,
             response="completedTaskQuery or incompleteTaskQuery failure"
         )
     
