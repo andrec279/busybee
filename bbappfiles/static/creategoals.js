@@ -1,11 +1,19 @@
 function goalmain() {
-    /* Render text form if user selects "Create New" category */
+    /* Function runs on load of planning page. Covers the following functionalities:
+        1. Validate user-inputted goal information
+        2. Allows user to delete goals
+        3. 
+    */
+
+    /* CREATE AND VALIDATE CATEGORY INPUTS AND SELECTION */
+    
+    // Render text form if user selects "Create New" category
     var createCat = document.getElementById("categoryInput");
     var goalForm = document.getElementById("goalForm");
     
     createCat.addEventListener('change', XMLRenderCat);
     
-    /*Apply real-time checking of goalForm to prevent duplicate entries*/
+    // TODO: Create function that checks whether item (category, goal, task) is duplicate
     goalForm.onkeyup = goalFormValidate;
     
     // Separate validation of category selection since it doesn't involve typing
@@ -24,21 +32,20 @@ function goalmain() {
             createCat.setCustomValidity('');
         }
     };
+
+    /* DELETING GOAL ENTRIES */
     
-    /*Render interactive goal list using information pulled into HTML page by Flask*/
-    
-    // Start by creating necessary list of HTML elements
+    // Get goal names and goal ID's - since goals and goal ID's are pulled from database in the same order,
+    // which happens in main.py, they can be paired by their index when loaded into HTML page
     goalElements = document.getElementsByClassName("goalName");
     goalIDElements = document.getElementsByClassName("goalItem");
-    
+
     // Pair each goal id to its goal to put the correct text in each button, add delete button
     for (var i=0;i<goalElements.length;i++) {
         goalIDElements[i].innerHTML = goalElements[i].textContent + "<span class='goalDeleteButton'>&#9447;</span>";
     }
     
-    /* Allow user to delete goal entries */
-    
-    // Allow user to see delete button if hovering over any goal buttons
+    // Show delete button if hovering over any goal buttons
     Object.entries(goalIDElements).map(( object ) => {
     
         // object[1] = array of all objects with class name attributed to goalIDElements
@@ -55,7 +62,7 @@ function goalmain() {
     
     goalDeleteButtons = document.getElementsByClassName("goalDeleteButton");
     
-    // Activate funciton to delete goal bucket upon clicking on x object
+    // Activate function to delete goal bucket and remove from DB upon clicking on x object
     Object.entries(goalDeleteButtons).map((object) => {
         
         object[1].addEventListener("click", function(event) {
@@ -65,7 +72,7 @@ function goalmain() {
         });
     });
     
-    // Instantiate 'addTask' function after clicking 'addTask' button
+    // Run 'addTask' function after clicking 'addTask' button
     taskSaver = document.getElementById("taskSave");
     taskSaver.addEventListener("click", addTask);
     
@@ -126,7 +133,7 @@ function setAttributes(el, attrs) {
 
 function replaceTextWithForms() {
     /* Front-end: This function replaces text elements in goalRender window with 
-    inputs, then replaces those inputs with the original text element formats 
+    inputs (forms), then replaces those inputs with the original text element formats 
     containing the values that were entered in the inputs after clicking 'Save Changes' */
 
     /* Back-end: After 'Save Changes' but before conversion into text elements, a snapshot 
@@ -256,7 +263,7 @@ function goalFormValidate() {
 }
 
 function deleteGoal(event) {
-    /* Allows user to delete a goal by clicking on 'X' symbol in goal button*/
+    /* Triggers GET request to delete goal from database and remove button from UI */
     activeButton = event.target;
     
     if (confirm('This goal will be deleted permanently and will NOT be marked as completed. Continue?')) {
@@ -264,7 +271,7 @@ function deleteGoal(event) {
         $.get('/delete?goalID=' + activeButton.parentNode.id, function() {
         
             // Delete goal bucket in real time
-            activeButton.parentNode.parentNode.parentNode.removeChild(activeButton.parentNode.parentNode);
+            activeButton.parentNode.parentNode.removeChild(activeButton.parentNode);
         });  
     }
 }
@@ -302,7 +309,7 @@ function renderGoal(elementID) {
     var goalAttributesRow = [];
     
     for (var i=0;i<goalRows.length;i++) {
-        // Each element should be a list of div tags, each containing an attribute
+        // Each element should be a list of span tags, each containing an attribute
         var goalAttributesDivs = goalRows[i].getElementsByClassName("goalattribute");
         
         // Check if last div in goalRows contains a matching ID

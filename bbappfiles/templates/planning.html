@@ -15,27 +15,30 @@
     <button type="button" class="btn btn-warning userdisplay-md" id="openButton" onclick="popUpOpen();">New Goal</button>
 </div>
 
+<!-- The following two sections attempt to load previous data. If no data is available, none is populated here -->
 <!--1st Hidden form to store goal rows-->
-<div class="hidden" id="hiddengoalrows">
-    {% for tuple in rows %}
-        <div class="goalrow">
-        {% for item in tuple %}
-            <span class="goalattribute">{{ item }}</span>
-        {% endfor %}
-        </div>
-    {% endfor %}
-</div>
-
-<!-- Hidden form to store task rows -->
-<div class="hidden" id="hiddentaskrows">
-    {% for taskattributes in taskrows %}
-        <div class="taskrow">
-            {% for taskattribute in taskattributes %}
-                <span class="taskattribute">{{ taskattribute }}</span>
+{% if db_is_populated == True %}
+    <div class="hidden" id="hiddengoalrows">
+        {% for tuple in rows %}
+            <div class="goalrow">
+            {% for item in tuple %}
+                <span class="goalattribute">{{ item }}</span>
             {% endfor %}
-        </div>
-    {% endfor %}
-</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Hidden form to store task rows -->
+    <div class="hidden" id="hiddentaskrows">
+        {% for taskattributes in taskrows %}
+            <div class="taskrow">
+                {% for taskattribute in taskattributes %}
+                    <span class="taskattribute">{{ taskattribute }}</span>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
 
 <!-- POP UP FOR CREATING NEW GOALS -->
 <div class="popUp" id="createGoal" name="createGoal"> 
@@ -57,7 +60,7 @@
             <div class="form-group">
                 <label for="categoryInput">Select Category: </label><br>
                 <!--Target select tag for onchange load of new category form-->
-                <select class="form-control popUpForm" autocomplete="off" name="categoryInput" id="categoryInput" required>
+                <select class="form-control popUpForm newCat" autocomplete="off" name="categoryInput" id="categoryInput" required>
                     <option selected="true" disabled="true">Choose Category</option>
                     <option class='loadedCat'>Create New</option>                    
                     
@@ -154,7 +157,7 @@
 <!-- Display Goal Buttons -->
 <div class="col-md" id="dynamicGoals">
     <!-- Display message if user has no current goals -->
-    {% if goals == [] %}
+    {% if db_is_populated == False %}
         You don't have any goals yet. Get started now!
     
     <!-- Pull goals from database and display as buttons -->
@@ -168,6 +171,7 @@
             {% endfor %}
         </div>
         
+        <!-- Renders goals as buttons that can be clicked for more info / editing -->
         {% for goalid in goalids %}
             <div class="goalListItems">
                 <button type="button" id="{{ goalid }}" class="goalItem userdisplay-md" onclick="renderGoal(this.id);"></button>

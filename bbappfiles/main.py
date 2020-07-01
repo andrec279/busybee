@@ -75,6 +75,29 @@ def after_request(response):
 @app.route("/", methods=["GET"])
 @login_required
 def graph():
+    ''' Set db_is_populated switch. False by default, switch to true if user has at least one entry
+    in the goals and tasks database'''
+    db_is_populated = False
+    try:
+        with dbsource.connect() as conn:
+            goalsCountQuery = sqlalchemy.text("SELECT * FROM goals WHERE id=:user_id")
+            tasksCountQuery = sqlalchemy.text("SELECT * from tasks WHERE id=:user_id")
+            goalsCount = len(conn.execute(goalsCountQuery, user_id=session["user_id"]).fetchall())
+            tasksCount = len(conn.execute(tasksCountQuery, user_id=session["user_id"]).fetchall())
+
+            if goalsCount > 0 and tasksCount > 0:
+                db_is_populated = True
+    except Exception as e:
+        logger.exception(e)
+        return Response(
+            status=502,
+            response="Failed to check db entry count"
+        )
+    
+    # If db_is_populated = False, render the "No Data Available" version of home.html
+    if db_is_populated == False:
+        return render_template("home.html", db_is_populated=db_is_populated)
+
     # Data point: Number of completed vs. in progress tasks
     try:
         with dbsource.connect() as conn:
@@ -83,7 +106,7 @@ def graph():
             
             incompleteTaskQuery = sqlalchemy.text("SELECT * FROM tasks WHERE id = :user_id AND completed = 0")
             progressCount = len(conn.execute(incompleteTaskQuery, user_id=session["user_id"]).fetchall())
-        
+
             '''Graph setup: taskCreations graph'''
             completedDates = []
             for row in conn.execute(completedTaskQuery, user_id=session["user_id"]).fetchall():
@@ -104,7 +127,13 @@ def graph():
     
     # Create list of consecutive dates over relevant range
     # Future Enhancement: Allow user to set these values through GET request
-    dateMin = min(completedDates)
+    # Error handling: If no completed tasks available, dateMin and dateMax are set 
+    # to today's date - no graph data is submitted
+
+    try:
+        dateMin = min(completedDates)
+    except:
+        dateMin = datetime.date.today()
     dateMax = datetime.date.today()
     
     formattedDateAxisList = []
@@ -375,6 +404,25 @@ def planning():
     
     else:    
 
+        # If no database entries are present (ie. new user) don't attempt to load any prior data
+        db_is_populated = False
+        try:
+            with dbsource.connect() as conn:
+                goalsCountQuery = sqlalchemy.text("SELECT * FROM goals WHERE id=:user_id")
+                goalsCount = len(conn.execute(goalsCountQuery, user_id=session["user_id"]).fetchall())
+
+                if goalsCount > 0:
+                    db_is_populated = True
+        except Exception as e:
+            logger.exception(e)
+            return Response(
+                status = 502,
+                response = "failed to count db entries"
+            )
+        
+        if db_is_populated == False:
+            return render_template("planning.html", db_is_populated=db_is_populated, categories=[])
+        
         # Select all goals created by user and instantiate list of rows returned
         try:
             with dbsource.connect() as conn:
@@ -401,7 +449,8 @@ def planning():
                 response = "goalDisplayQuery or TaskDisplayQuery failure"
             )
         
-        return render_template("planning.html", goals=goals, categories=categories, goalids=goalids, rows=rows, taskrows=taskrows)
+        return render_template("planning.html", db_is_populated=db_is_populated, goals=goalDict['goals'], categories=goalDict['categories'], 
+                               goalids=goalDict['goalids'], rows=rows, taskrows=taskrows)
 
 
 @app.route("/createtask", methods=["GET"])
@@ -509,6 +558,11 @@ def delete():
             with dbsource.connect() as conn:
                 goalDeleteStmt = sqlalchemy.text("DELETE FROM goals WHERE pk_col = :goalID")
                 conn.execute(goalDeleteStmt, goalID=goalID)
+                
+                # Don't forget to delete all tasks associated with the goal!
+                goalTasksDeleteStmt = sqlalchemy.text("DELETE FROM tasks WHERE goalID = :goalID")
+                conn.execute(goalTasksDeleteStmt, goalID=goalID)
+
                 return redirect("/planning")
         except Exception as e:
             logger.exception(e)
@@ -586,7 +640,7 @@ def profilechange():
         try:
             with dbsource.connect() as conn:
                 passUpdateStmnt = sqlalchemy.text("UPDATE users SET hashpass=:hashpass WHERE id=:user_id")
-                conn.execute(passUpdateStmnt, [hashpass, session["user_id"]])
+                conn.execute(passUpdateStmnt, hashpass=hashpass, user_id=session["user_id"])
         except Exception as e:
             logger.exception(e)
             return Response(

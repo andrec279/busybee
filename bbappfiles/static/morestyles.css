@@ -353,7 +353,7 @@ input
     width: 30%;
 }
 
-.form-control.popUpForm
+.popUpForm
 {
     width: 80%;
     max-width: 300px;

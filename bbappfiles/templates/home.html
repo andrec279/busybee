@@ -16,60 +16,71 @@
 <!-- 2x1 grid display (subject to change later) -->
 <div class="container-fluid">
     <!-- 1st row for tasks summary, categories breakdown with drilldown to tasks per goal -->
-    <div class="row">
-        <div class="col">
-            <div class="userdisplay-md-w">
-                Tasks
+    {% if db_is_populated == False %}
+        <div class="row">
+            <div class="col graybox">
+                <div class="userdisplay-md">
+                    <b>No Data Available</b>
+                    <div class="userdisplay-sm">Head to the Planning page to start planning your goals!</div>
+                </div>
             </div>
-            <table>
-                <tr>
-                    <!-- Display number of completed goals -->
-                    <td id="completedLabel">Completed</td> <td id="completedData">{{ completedCount }}</td>
-                    
-                    <!-- Display number of in progress goals -->
-                    <td id="inProgressLabel">In Progress</td> <td id="inProgressData">{{ progressCount }}</td>
-                </tr>
-            </table>
-            <br>
-            <div id={{ chart2ID|safe }} class="chart"></div>
-            <script>
-                var chart2ID = {{ chart2ID|safe }};
-                var series2 = {{ series2|safe }};
-                var title2 = {{ title2|safe }};
-                var chart2 = {{ chart2|safe }};
-                var drilldown2 = {{ drilldown2|safe }};
-                var subtitle2 = {{ subtitle2|safe }};
-            </script>
         </div>
-    </div>
-    
-    <!-- 2nd row for task completion over time graph -->
-    <div class="row">
-        <!-- Graph spans row to display task completion data -->
-        <div class="col">
-            <br>
-            <div id="chart2wrap">
-                <div id={{ chart1ID|safe }} class="chart"></div>
+    {% else %}
+        <div class="row">
+            <div class="col">
+                <div class="userdisplay-md-w">
+                    Tasks
+                </div>
+                <table>
+                    <tr>
+                        <!-- Display number of completed goals -->
+                        <td id="completedLabel">Completed</td> <td id="completedData">{{ completedCount }}</td>
+                        
+                        <!-- Display number of in progress goals -->
+                        <td id="inProgressLabel">In Progress</td> <td id="inProgressData">{{ progressCount }}</td>
+                    </tr>
+                </table>
+                <br>
+                <div id={{ chart2ID|safe }} class="chart"></div>
+                <script>
+                    var chart2ID = {{ chart2ID|safe }};
+                    var series2 = {{ series2|safe }};
+                    var title2 = {{ title2|safe }};
+                    var chart2 = {{ chart2|safe }};
+                    var drilldown2 = {{ drilldown2|safe }};
+                    var subtitle2 = {{ subtitle2|safe }};
+                </script>
             </div>
-            <script>
-                var chart1ID = {{ chart1ID|safe }};
-                var series1 = {{ series1|safe }};
-                var title1 = {{ title1|safe }};
-                var xAxis1 = {{ xAxis1|safe }};
-                var chart1 = {{ chart1|safe }};
-            </script>
-            
-            <!--Highcharts plugin to generate dynamic data visualizations-->
-			<script src="https://code.highcharts.com/highcharts.js"></script>
-            <script src="https://code.highcharts.com/modules/series-label.js"></script>
-            <script src="https://code.highcharts.com/modules/data.js"></script>
-            <script src="https://code.highcharts.com/modules/drilldown.js"></script>
-            <script src="https://code.highcharts.com/modules/exporting.js"></script>
-            <script src="https://code.highcharts.com/modules/export-data.js"></script>
-            
-			<script src="../static/graphs.js"></script>
         </div>
-    </div>
+        
+        <!-- 2nd row for task completion over time graph -->
+        <div class="row">
+            <!-- Graph spans row to display task completion data -->
+            <div class="col">
+                <br>
+                <div id="chart2wrap">
+                    <div id={{ chart1ID|safe }} class="chart"></div>
+                </div>
+                <script>
+                    var chart1ID = {{ chart1ID|safe }};
+                    var series1 = {{ series1|safe }};
+                    var title1 = {{ title1|safe }};
+                    var xAxis1 = {{ xAxis1|safe }};
+                    var chart1 = {{ chart1|safe }};
+                </script>
+                
+                <!--Highcharts plugin to generate dynamic data visualizations-->
+                <script src="https://code.highcharts.com/highcharts.js"></script>
+                <script src="https://code.highcharts.com/modules/series-label.js"></script>
+                <script src="https://code.highcharts.com/modules/data.js"></script>
+                <script src="https://code.highcharts.com/modules/drilldown.js"></script>
+                <script src="https://code.highcharts.com/modules/exporting.js"></script>
+                <script src="https://code.highcharts.com/modules/export-data.js"></script>
+                
+                <script src="../static/graphs.js"></script>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 {% endblock %}
