@@ -134,9 +134,9 @@ function setAttributes(el, attrs) {
 function replaceTextWithForms() {
     /* Front-end: This function replaces text elements in goalRender window with 
     inputs (forms), then replaces those inputs with the original text element formats 
-    containing the values that were entered in the inputs after clicking 'Save Changes' */
+    containing the values that were entered in the inputs after clicking 'Save Changes'
 
-    /* Back-end: After 'Save Changes' but before conversion into text elements, a snapshot 
+    Back-end: After 'Save Changes' but before conversion into text elements, a snapshot 
     of all data in the goalRender window is sent to the server to update database values 
     where necessary*/
 
@@ -288,10 +288,14 @@ function deleteTask(deleteButton) {
             // Delete hidden taskrow where renderGoal window refers to when rendering task
             var taskRows = document.getElementsByClassName('taskrow');
             for (row of taskRows) {
-                if (row[6].innerHTML === deleteButton.id) {
+                var taskAttributes = row.getElementsByClassName('taskattribute');
+                if (taskAttributes[6].innerHTML === deleteButton.id) {
                     row.parentNode.removeChild(row);
                 }
             }
+            // Render save changes button
+            $('#saveTaskChanges').css('display', 'block');
+
         }) 
     }
 }
@@ -426,29 +430,42 @@ function addTask() {
     taskName = document.getElementById('newTaskName');
     
     $.get('/createtask?goalID=' + goalID + '&taskName=' + taskName.value, function(task_id) {
-        /* GET Request to store newly created task in database and link to the correct goal using goalID
+        /* Activates when clicking on "Save" next to the new task form. 
+           GET Request to store newly created task in database and link to the correct goal using goalID.
            Server returns the task id of the newly created task so any changes to the task (check/uncheck) can be
-           properly saved in the database later */
+           properly saved in the database later. */
         if (task_id) {
-            // Assemble DOM Node for each task/checkbox combo
+            /* Assemble DOM Node for each task/checkbox combo. Example task structure:
+            <div id="taskList" class="container-fluid">    
+                <div class="form-group row task">
+                    <span class="taskDeleteButton hidden" id="1" onclick="deleteTask(this);">ⓧ</span>
+                    <div class="col-9 left userdisplay-sm data-editable">Create User Stories</div>
+                    <div class="col-3">
+                        <div class="form-check left">
+                            <input class="form-check-input" type="checkbox" name="taskChecks" id="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            */
         
-            // Task delete + task name + checkbox container
+            // Create container task delete button + task name + checkbox
             var row = document.createElement('div');
             row.setAttribute('class', 'form-group row task');
 
-            // Task delete button (hidden)
+            // Create task delete button span (hidden until hovered over)
             taskDeleteButton = document.createElement('span');
             taskDeleteButton.innerHTML = '&#9447;';
             setAttributes(taskDeleteButton, {'class': 'taskDeleteButton hidden',
                                             'id': task_id,
                                             'onclick': 'deleteTask(this);'});
 
-            // Task name
+            // Create task name div
             var taskDiv = document.createElement('div');
             taskDiv.setAttribute('class', 'col-9 left userdisplay-sm data-editable');
             taskDiv.textContent = taskName.value;
             
-            // Checkbox container + checkbox
+            // Create checkbox container + checkbox
             var checkBoxCol = document.createElement('div');
             checkBoxCol.setAttribute('class', 'col-3');
             var checkBoxContainer = document.createElement('div');
