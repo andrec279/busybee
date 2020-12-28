@@ -524,7 +524,7 @@ def goalupdate():
                 taskReadQuery = sqlalchemy.text('SELECT completed FROM tasks WHERE taskID = :checkedTaskID')
                 checkedTaskUpdateStmnt = sqlalchemy.text('UPDATE tasks SET completed=1, date_completed=:today WHERE taskID=:checkedTaskID')
                 if conn.execute(taskReadQuery, checkedTaskID=checked_task_id).fetchone() == (0,):
-                    conn.execute(checkedTaskUpdateStmnt, today=datetime.date.today(), taskID=checked_task_id)
+                    conn.execute(checkedTaskUpdateStmnt, today=datetime.date.today(), checkedTaskID=checked_task_id)
         except Exception as e:
             logger.exception(e)
             return Response(
