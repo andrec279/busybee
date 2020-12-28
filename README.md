@@ -13,8 +13,8 @@ busybee is a personal project I built while teaching myself how to code. My lear
 <b>How it works:</b>
 Note: This web application is best viewed with some user data already inputted. To view a more "complete" profile for a test account I created, log into the web application with the following credentials:
 
-username: test1
-password: test
+<b>username:</b> test1
+<b>password:</b> test
 
 busybee allows users to organize their lives into categories: school, work, hobbies, etc.
 They can then create goals within those categories and subtasks in checklist format.
