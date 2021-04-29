@@ -1,4 +1,0 @@
-cloud_sql_connection_name: 'busybee-264219:us-east1:bbdb'
-db_user: 'root'
-db_pass: 'password'
-db_name: 'musedb'
